@@ -37,7 +37,7 @@ class ChatClientGUI:
         tk.Label(self.login_frame, text="Server IP:", font=("Arial", 11)).grid(row=1, column=0, pady=5, sticky="e")
         self.ent_ip = tk.Entry(self.login_frame, font=("Arial", 11))
         self.ent_ip.grid(row=1, column=1, pady=5)
-        self.ent_ip.insert(0, "34.47.43.166") # Εδώ βάζουμε την IP του server
+        self.ent_ip.insert(0, "127.0.0.1") # Εδώ βάζουμε την IP του server
 
         tk.Label(self.login_frame, text="Port:", font=("Arial", 11)).grid(row=2, column=0, pady=5, sticky="e")
         self.ent_port = tk.Entry(self.login_frame, font=("Arial", 11))

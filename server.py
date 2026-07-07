@@ -2,6 +2,85 @@ import socket
 import json
 import threading
 import time
+import sqlite3
+from datetime import datetime
+
+
+# --- ΛΕΙΤΟΥΡΓΙΕΣ ΙΣΤΟΡΙΚΟΥ (PERSISTENCE) ---
+def init_db():
+    """Δημιουργεί τη βάση δεδομένων αν δεν υπάρχει."""
+    conn = sqlite3.connect('chat_history.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            msg_type TEXT,
+            sender TEXT,
+            target TEXT,
+            payload TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def save_message(msg_type, sender, target, payload):
+    """Αποθηκεύει ένα νέο μήνυμα στη βάση."""
+    conn = sqlite3.connect('chat_history.db')
+    cursor = conn.cursor()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute('INSERT INTO messages (timestamp, msg_type, sender, target, payload) VALUES (?, ?, ?, ?, ?)',
+                   (timestamp, msg_type, sender, target, payload))
+    conn.commit()
+    conn.close()
+
+def get_history(target_type, target_name, requesting_user):
+    """Ανακτά μηνύματα φιλτράροντας με βάση τον χρήστη που κάνει το αίτημα."""
+    conn = sqlite3.connect('chat_history.db')
+    cursor = conn.cursor()
+    
+    if target_type == "BROADCAST":
+        # Τα καθολικά μηνύματα είναι ορατά σε όλους
+        cursor.execute("SELECT timestamp, sender, payload FROM messages WHERE msg_type='BROADCAST' ORDER BY id DESC LIMIT 20")
+    
+    elif target_type == "ROOM":
+        # Τα μηνύματα δωματίου είναι ορατά σε όσους συμμετέχουν στο δωμάτιο
+        cursor.execute("SELECT timestamp, sender, payload FROM messages WHERE msg_type='ROOM_MSG' AND target=? ORDER BY id DESC LIMIT 20", (target_name,))
+    
+    elif target_type == "PRIVATE":
+        # Φιλτράρισμα ασφαλείας: Ο χρήστης πρέπει να είναι είτε ο sender είτε ο target.
+        # Αν ο target_name περιέχει κάποιο όνομα, δείχνει τη συγκεκριμένη συνομιλία (π.χ. α με β).
+        if target_name:
+            cursor.execute("""
+                SELECT timestamp, sender, payload FROM messages 
+                WHERE msg_type='PRIVATE' 
+                AND ((sender=? AND target=?) OR (sender=? AND target=?)) 
+                ORDER BY id DESC LIMIT 20
+            """, (requesting_user, target_name, target_name, requesting_user))
+        else:
+            # Αν δεν έχει επιλεγεί target, επιστρέφει όλα τα προσωπικά μηνύματα που τον αφορούν γενικά
+            cursor.execute("""
+                SELECT timestamp, sender, payload FROM messages 
+                WHERE msg_type='PRIVATE' 
+                AND (sender=? OR target=?) 
+                ORDER BY id DESC LIMIT 20
+            """, (requesting_user, requesting_user))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    
+    # Επιστροφή με χρονολογική σειρά
+    return [{"time": r[0], "sender": r[1], "payload": r[2]} for r in reversed(rows)]
+
+
+
+
+
+
+
+
+
+
 
 HOST = '127.0.0.1'
 PORT = 12345
@@ -51,6 +130,7 @@ def check_timeouts(server_socket):
                     if username in last_seen: del last_seen[username]
 
 def start_server():
+    init_db()
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_socket.bind((HOST, PORT))
     print(f"[STARTING] Ο UDP Server ακούει στη θύρα {PORT}...")
@@ -97,6 +177,7 @@ def start_server():
                 # 3.2 Καθολική Εκπομπή (BROADCAST)
                 elif action == "BROADCAST":
                     print(f"[BROADCAST] Από {sender}: {payload}")
+                    save_message("BROADCAST", sender, "ALL", payload)
                     broadcast_global(server_socket, {
                         "msg_id": 503, "action": "BROADCAST", "sender": sender, "target": None, "payload": payload, "status": "SUCCESS"
                     }, exclude_user=sender)
@@ -104,6 +185,7 @@ def start_server():
                 # 3.3 Προσωπικό Μήνυμα (PRIVATE)
                 elif action == "PRIVATE":
                     print(f"[PRIVATE] Από {sender} προς {target}: {payload}")
+                    save_message("PRIVATE", sender, target, payload)
                     if target in clients:
                         send_udp(server_socket, clients[target], {"msg_id": 504, "action": "PRIVATE", "sender": sender, "target": target, "payload": payload, "status": "SUCCESS"})
                     else:
@@ -126,7 +208,27 @@ def start_server():
                     current_room = user_rooms.get(sender)
                     print(f"[ROOM MSG] Από {sender} στο '{current_room}': {payload}")
                     if current_room:
+                        save_message("ROOM_MSG", sender, current_room, payload)
                         broadcast_to_room(server_socket, current_room, {"msg_id": 506, "action": "ROOM_MSG", "sender": sender, "target": current_room, "payload": payload, "status": "SUCCESS"}, exclude_user=sender)
+
+
+                elif action == "HISTORY_REQUEST":
+                    history_type = target  # "BROADCAST", "ROOM" ή "PRIVATE"
+                    target_name = payload  # Όνομα δωματίου ή ο συγκεκριμένος συνομιλητής
+                    
+                    history_data = get_history(history_type, target_name, sender)
+                    print(f"[HISTORY] Αποστολή ιστορικού ({history_type}) στον {sender}")
+                    
+                    send_udp(server_socket, client_address, {
+                        "msg_id": 508, 
+                        "action": "HISTORY_RESPONSE", 
+                        "sender": "SERVER", 
+                        "target": sender, 
+                        "payload": history_data, 
+                        "status": "SUCCESS"
+                    })
+
+
 
                 # 3.5 Προβολή Συνδεδεμένων Χρηστών (LIST_USERS)
                 elif action == "LIST_USERS":

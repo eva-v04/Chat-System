@@ -53,6 +53,18 @@ def receive_messages(client_socket):
                 print(f"\n[ROOM INFO]: {payload}")
             elif action == "LIST_USERS_RESPONSE":
                 print(f"\n[SERVER] Συνδεδεμένοι χρήστες: {', '.join(payload)}")
+            
+            elif action == "HISTORY_RESPONSE":
+                print(f"\n--- ΙΣΤΟΡΙΚΟ ΜΗΝΥΜΑΤΩΝ ---")
+                if not payload:
+                    print("Δεν υπάρχουν παλαιότερα μηνύματα.")
+                for msg_data in payload:
+                    print(f"[{msg_data['time']}] {msg_data['sender']}: {msg_data['payload']}")
+                print("--------------------------")
+            
+            
+            
+            
             elif action in ["INFO", "RESPONSE"]:
                 if status == "ERROR":
                     print(f"\n[ERROR]: {payload}")
@@ -89,7 +101,10 @@ def start_client():
     print("3. Για καθολικό μήνυμα γράψε: @all <μήνυμα>")
     print("4. Για προσωπικό μήνυμα γράψε: @<username> <μήνυμα>")
     print("5. Για λίστα χρηστών γράψε: #list")
-    print("6. Για έξοδο γράψε: #exit")
+    print("6. Για γενικό ιστορικό ή δωματίου: #history")
+    print("7. Για όλο το προσωπικό ιστορικό: #history private")
+    print("8. Για ιστορικό με συγκεκριμένο χρήστη: #history @<username>")
+    print("9. Για έξοδο γράψε: #exit")
     print("="*50 + "\n")
 
     while True:
@@ -104,6 +119,30 @@ def start_client():
                 break
             elif user_input.strip() == "#list":
                 pkt = {"msg_id": get_next_msg_id(), "action": "LIST_USERS", "sender": username, "target": None, "payload": None, "status": None}
+            
+            
+            elif user_input.startswith("#history"):
+                parts = user_input.split()
+                
+                # Περίπτωση 1: Συγκεκριμένη ιδιωτική συνομιλία 
+                if len(parts) > 1 and parts[1].startswith("@"):
+                    target_user = parts[1][1:] # Αφαιρούμε το '@'
+                    pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "PRIVATE", "payload": target_user, "status": None}
+                    
+                # Περίπτωση 2: Όλα τα προσωπικά μηνύματα του χρήστη 
+                elif len(parts) > 1 and parts[1].lower() == "private":
+                    pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "PRIVATE", "payload": None, "status": None}
+                    
+                # Περίπτωση 3: Απλό #history (Δωμάτιο αν είναι μέσα, αλλιώς Καθολικά)
+                else:
+                    if current_room:
+                        pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "ROOM", "payload": current_room, "status": None}
+                    else:
+                        pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "BROADCAST", "payload": None, "status": None}
+            
+            
+            
+            
             elif user_input.startswith("#join "):
                 room = user_input[6:].strip()
                 current_room = room

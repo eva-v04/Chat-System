@@ -111,6 +111,7 @@ class ChatClientGUI:
 
         btn_send = tk.Button(input_frame, text="Αποστολή", bg="#2196F3", fg="white", command=self.send_message)
         btn_send.pack(side="right", padx=5)
+        
 
         # Δεξί Panel (Δωμάτια και Χρήστες)
         right_panel = tk.Frame(self.main_frame, width=150, padx=10)
@@ -131,6 +132,8 @@ class ChatClientGUI:
         # Κουμπιά ενεργειών
         btn_list = tk.Button(right_panel, text="Ποιοι είναι μέσα;", bg="#FF9800", fg="white", command=self.request_user_list)
         btn_list.pack(fill="x", pady=5)
+        btn_history = tk.Button(right_panel, text="Ιστορικό", bg="#9C27B0", fg="white", command=self.request_history)
+        btn_history.pack(fill="x", pady=5)
 
         btn_exit = tk.Button(right_panel, text="Έξοδος", bg="#f44336", fg="white", command=self.disconnect_server)
         btn_exit.pack(fill="x", side="bottom", pady=10)
@@ -176,6 +179,19 @@ class ChatClientGUI:
                     self.log_message(f"[ROOM INFO]: {payload}")
                 elif action == "LIST_USERS_RESPONSE":
                     self.log_message(f"[SERVER] Συνδεδεμένοι χρήστες: {', '.join(payload)}")
+                
+                elif action == "HISTORY_RESPONSE":
+                    self.log_message(f"\n--- ΙΣΤΟΡΙΚΟ ---")
+                    if not payload:
+                        self.log_message("Κενό ιστορικό.")
+                    for msg_data in payload:
+                        self.log_message(f"[{msg_data['time']}] {msg_data['sender']}: {msg_data['payload']}")
+                    self.log_message("----------------")
+                
+                
+                
+                
+                
                 elif action in ["INFO", "RESPONSE"]:
                     if status == "ERROR":
                         self.log_message(f"[ERROR]: {payload}")
@@ -183,6 +199,31 @@ class ChatClientGUI:
                         self.log_message(f"[SERVER]: {payload}")
             except Exception:
                 break
+
+
+    def request_history(self):
+        mode = self.msg_type_combo.get()  # Παίρνει την τιμή "Broadcast", "Room" ή "Private"
+        target = self.ent_target.get().strip()
+        
+        if mode == "Room":
+            if not self.current_room:
+                messagebox.showwarning("Προειδοποίηση", "Δεν είστε σε κάποιο δωμάτιο!")
+                return
+            pkt = {"msg_id": self.get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": self.username, "target": "ROOM", "payload": self.current_room, "status": None}
+        elif mode == "Private":
+            if not target:
+                messagebox.showwarning("Προειδοποίηση", "Συμπληρώστε το πεδίο 'Προς/Στόχος' για να δείτε τη συνομιλία με τον συγκεκριμένο χρήστη.")
+                return
+            pkt = {"msg_id": self.get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": self.username, "target": "PRIVATE", "payload": target, "status": None}
+        else:
+            pkt = {"msg_id": self.get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": self.username, "target": "BROADCAST", "payload": None, "status": None}
+            
+        try:
+            self.client_socket.sendto(json.dumps(pkt).encode('utf-8'), self.server_address)
+        except Exception as e:
+            self.log_message(f"[ERROR]: Αποτυχία αιτήματος ιστορικού: {e}")
+
+
 
     def send_message(self):
         content = self.ent_msg.get().strip()

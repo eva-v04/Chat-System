@@ -53,30 +53,29 @@ def receive_messages(client_socket):
                 print(f"\n[ROOM INFO]: {payload}")
             elif action == "LIST_USERS_RESPONSE":
                 print(f"\n[SERVER] Συνδεδεμένοι χρήστες: {', '.join(payload)}")
-            
             elif action == "HISTORY_RESPONSE":
                 print(f"\n--- ΙΣΤΟΡΙΚΟ ΜΗΝΥΜΑΤΩΝ ---")
                 if not payload:
                     print("Δεν υπάρχουν παλαιότερα μηνύματα.")
-                for msg_data in payload:
-                    print(f"[{msg_data['time']}] {msg_data['sender']}: {msg_data['payload']}")
-                print("--------------------------")
-            
-            
-            
-            
+                else:
+                    for msg_data in payload:
+                        print(f"[{msg_data['time']}] {msg_data['sender']}: {msg_data['payload']}")
+                print("--------------------------")            
             elif action in ["INFO", "RESPONSE"]:
                 if status == "ERROR":
                     print(f"\n[ERROR]: {payload}")
                 else:
                     print(f"\n[SERVER]: {payload}")
-        except Exception:
-            break
+        except Exception as e:
+            print(f"[ERROR]: {e}")
+        
 
 def start_client():
     global authenticated, current_room
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     
+    client_socket.bind(('', 0))  
+
     username = input("Δώσε το username σου: ")
     connect_pkt = {"msg_id": 101, "action": "CONNECT", "sender": username, "target": None, "payload": None, "status": None}
     
@@ -118,9 +117,7 @@ def start_client():
                 client_socket.sendto(json.dumps(pkt).encode('utf-8'), SERVER_ADDRESS)
                 break
             elif user_input.strip() == "#list":
-                pkt = {"msg_id": get_next_msg_id(), "action": "LIST_USERS", "sender": username, "target": None, "payload": None, "status": None}
-            
-            
+                pkt = {"msg_id": get_next_msg_id(), "action": "LIST_USERS", "sender": username, "target": None, "payload": None, "status": None}           
             elif user_input.startswith("#history"):
                 parts = user_input.split()
                 
@@ -138,11 +135,7 @@ def start_client():
                     if current_room:
                         pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "ROOM", "payload": current_room, "status": None}
                     else:
-                        pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "BROADCAST", "payload": None, "status": None}
-            
-            
-            
-            
+                        pkt = {"msg_id": get_next_msg_id(), "action": "HISTORY_REQUEST", "sender": username, "target": "BROADCAST", "payload": None, "status": None}        
             elif user_input.startswith("#join "):
                 room = user_input[6:].strip()
                 current_room = room
@@ -150,17 +143,20 @@ def start_client():
             elif user_input.startswith("@all "):
                 content = user_input[5:]
                 pkt = {"msg_id": get_next_msg_id(), "action": "BROADCAST", "sender": username, "target": None, "payload": content, "status": None}
+                print(f"[Εσύ στο όλους]: {content}")
             elif user_input.startswith("@room "):
                 if not current_room:
                     print("[ERROR]: Δεν βρίσκεσαι σε κάποιο δωμάτιο. Μπες πρώτα με #join <room>")
                     continue
                 content = user_input[6:]
                 pkt = {"msg_id": get_next_msg_id(), "action": "ROOM_MSG", "sender": username, "target": current_room, "payload": content, "status": None}
+                print(f"[Εσύ στο {current_room}]: {content}")
             elif user_input.startswith("@") and " " in user_input:
                 parts = user_input.split(" ", 1)
                 target_user = parts[0][1:]
                 content = parts[1]
                 pkt = {"msg_id": get_next_msg_id(), "action": "PRIVATE", "sender": username, "target": target_user, "payload": content, "status": None}
+                print(f"[Εσύ προς {target_user}]: {content}")
             else:
                 print("Μη έγκυρη εντολή.")
                 continue

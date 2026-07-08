@@ -228,8 +228,6 @@ def start_server():
                         "status": "SUCCESS"
                     })
 
-
-
                 # 3.5 Προβολή Συνδεδεμένων Χρηστών (LIST_USERS)
                 elif action == "LIST_USERS":
                     user_list = list(clients.keys())

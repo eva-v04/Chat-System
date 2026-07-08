@@ -12,6 +12,7 @@ class ChatClientGUI:
         self.root.geometry("650x500")
         
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.client_socket.bind(('', 0))  
         self.server_address = None
         self.username = ""
         self.authenticated = False
@@ -141,10 +142,13 @@ class ChatClientGUI:
         self.log_message("[SYSTEM]: Επιτυχής σύνδεση στο chat!")
 
     def log_message(self, text):
-        self.chat_area.config(state="normal")
-        self.chat_area.insert(tk.END, text + "\n")
-        self.chat_area.see(tk.END)
-        self.chat_area.config(state="disabled")
+        if hasattr(self, 'chat_area'):
+            self.chat_area.config(state="normal")
+            self.chat_area.insert(tk.END, text + "\n")
+            self.chat_area.see(tk.END)
+            self.chat_area.config(state="disabled")
+        else:
+            print(f"[{text}] (Αναμονή για GUI...)")
 
     def send_heartbeat(self):
         while self.authenticated:
@@ -179,26 +183,21 @@ class ChatClientGUI:
                     self.log_message(f"[ROOM INFO]: {payload}")
                 elif action == "LIST_USERS_RESPONSE":
                     self.log_message(f"[SERVER] Συνδεδεμένοι χρήστες: {', '.join(payload)}")
-                
                 elif action == "HISTORY_RESPONSE":
                     self.log_message(f"\n--- ΙΣΤΟΡΙΚΟ ---")
                     if not payload:
                         self.log_message("Κενό ιστορικό.")
                     for msg_data in payload:
                         self.log_message(f"[{msg_data['time']}] {msg_data['sender']}: {msg_data['payload']}")
-                    self.log_message("----------------")
-                
-                
-                
-                
-                
+                    self.log_message("----------------")                
                 elif action in ["INFO", "RESPONSE"]:
                     if status == "ERROR":
                         self.log_message(f"[ERROR]: {payload}")
                     else:
                         self.log_message(f"[SERVER]: {payload}")
-            except Exception:
-                break
+            except Exception as e:
+                self.log_message(f"[ERROR]: {e}")
+                
 
 
     def request_history(self):

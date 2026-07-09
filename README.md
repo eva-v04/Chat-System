@@ -80,7 +80,7 @@
     "action": "BROADCAST",
     "sender": "user1",
     "target": "all",
-    "payload": "Γεια σου κόσμε!",
+    "payload": "Hello!",
     "status": "SUCCESS"
 }
 ```

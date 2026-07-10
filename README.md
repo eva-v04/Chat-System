@@ -321,3 +321,10 @@ python3 client.py
 # Prompt Videos
 
 ## SSH Server Prompt Video
+<img width="1913" height="968" alt="server-video-prompt" src="https://github.com/user-attachments/assets/8d11808d-4ad2-40a3-abc1-8eb12923d5f7" />
+
+## GUI Prompt Video
+<img width="1895" height="954" alt="gui-video-prompt" src="https://github.com/user-attachments/assets/2b0f8332-cfb3-43f0-8dc9-a33885447894" />
+
+## Local Prompt Video
+<img width="1895" height="948" alt="local-video-prompt" src="https://github.com/user-attachments/assets/6b657fd4-fceb-45a1-8979-996c8d9a75d6" />
